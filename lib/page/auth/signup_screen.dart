@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; //this
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -11,6 +12,41 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+
+  // Function to handle user signup with Firebase this
+  Future<void> _signUp() async {
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+    String confirmPassword = _confirmPasswordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      _showError('Please fill all fields');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showError('Passwords do not match');
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      Navigator.pushReplacementNamed(context, '/home'); // Navigate to home
+    } catch (e) {
+      _showError(e.toString()); // Show error if signup fails
+    }
+  }
+
+  // Function to show error messages  this
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

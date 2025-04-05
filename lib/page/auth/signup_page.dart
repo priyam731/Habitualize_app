@@ -1,4 +1,6 @@
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Firebase Auth import
 
 class SignupPage extends StatefulWidget {
   const SignupPage({Key? key}) : super(key: key);
@@ -12,6 +14,33 @@ class _SignupPageState extends State<SignupPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  final FirebaseAuth _auth = FirebaseAuth.instance; // ✅ Add FirebaseAuth instance
+
+  /// ✅ Firebase Signup Function
+  Future<void> _signUp() async {
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    try {
+      await _auth.createUserWithEmailAndPassword( // ✅ Now `_auth` is recognized
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signup Successful')),
+      );
+      Navigator.pop(context); // ✅ Navigate back after signup
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())), // ✅ Show error if signup fails
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,12 +96,10 @@ class _SignupPageState extends State<SignupPage> {
                   isPassword: true,
                 ),
                 const SizedBox(height: 24),
+                
+                /// ✅ Call `_signUp()` function on button press
                 ElevatedButton(
-                  onPressed: () {
-                    // Here you would typically handle signup
-                    // For now, just navigate back to login
-                    Navigator.pop(context);
-                  },
+                  onPressed: _signUp, // ✅ Now signup works!
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
@@ -92,6 +119,7 @@ class _SignupPageState extends State<SignupPage> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
@@ -120,6 +148,7 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
+  /// ✅ Reusable TextField Widget
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,

@@ -1,4 +1,7 @@
+
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Firebase Auth import
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLogin;
@@ -12,6 +15,26 @@ class LoginPage extends StatefulWidget {
 class _LoginpageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  final FirebaseAuth _auth = FirebaseAuth.instance; // ✅ Add FirebaseAuth instance
+
+  /// ✅ Firebase Login Function
+  Future<void> _login() async {
+    try {
+      await _auth.signInWithEmailAndPassword( // ✅ Now `_auth` is recognized
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login Successful')),
+      );
+      widget.onLogin(); // ✅ Call the callback function after successful login
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())), // ✅ Show error if login fails
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,12 +76,10 @@ class _LoginpageState extends State<LoginPage> {
                   isPassword: true,
                 ),
                 const SizedBox(height: 24),
+
+                /// ✅ Call `_login()` function on button press
                 ElevatedButton(
-                  onPressed: () {
-                    // Here you would typically validate credentials
-                    // For now, we'll just call onLogin
-                    widget.onLogin();
-                  },
+                  onPressed: _login, // ✅ Now login works!
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
@@ -78,6 +99,7 @@ class _LoginpageState extends State<LoginPage> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () => Navigator.pushNamed(context, '/signup'),
@@ -116,6 +138,7 @@ class _LoginpageState extends State<LoginPage> {
     );
   }
 
+  /// ✅ Reusable TextField Widget
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,
