@@ -2,10 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:habitualize/page/profile/edit_profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:habitualize/providers/profile_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      // Navigate to login page
+      Navigator.pushReplacementNamed(context, '/login');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error logging out: ${e.toString()}')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,9 +30,7 @@ class ProfilePage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              // TODO: Implement logout functionality
-            },
+            onPressed: () => _logout(context),
           ),
         ],
       ),
@@ -90,7 +101,7 @@ class ProfilePage extends StatelessWidget {
                 _buildProfileTile(
                   icon: Icons.calendar_today,
                   title: 'Date of Birth',
-                  subtitle: '01/01/1990',
+                  subtitle: profileData.dob,
                 ),
               ],
             ),
@@ -115,6 +126,12 @@ class ProfilePage extends StatelessWidget {
                   onTap: () {
                     // TODO: Navigate to privacy settings
                   },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  title:
+                      const Text('Logout', style: TextStyle(color: Colors.red)),
+                  onTap: () => _logout(context),
                 ),
               ],
             ),

@@ -1,7 +1,8 @@
 
-
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ Firebase Auth import
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart'; // ✅ Add this
+import 'package:habitualize/providers/profile_provider.dart'; // ✅ Add this
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLogin;
@@ -16,22 +17,27 @@ class _LoginpageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  final FirebaseAuth _auth = FirebaseAuth.instance; // ✅ Add FirebaseAuth instance
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// ✅ Firebase Login Function
   Future<void> _login() async {
     try {
-      await _auth.signInWithEmailAndPassword( // ✅ Now `_auth` is recognized
+      await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // ✅ Load user info into ProfileProvider after login
+      await context.read<ProfileProvider>().loadUserFromFirebase();
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Successful')),
       );
-      widget.onLogin(); // ✅ Call the callback function after successful login
+
+      widget.onLogin(); // ✅ Continue to home/profile page
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())), // ✅ Show error if login fails
+        SnackBar(content: Text(e.toString())),
       );
     }
   }
@@ -77,9 +83,9 @@ class _LoginpageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
 
-                /// ✅ Call `_login()` function on button press
+                /// ✅ Login Button
                 ElevatedButton(
-                  onPressed: _login, // ✅ Now login works!
+                  onPressed: _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(

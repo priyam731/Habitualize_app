@@ -1,6 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ✅ Firebase Auth import
+import 'package:provider/provider.dart'; // ✅ For ProfileProvider access
+import 'package:habitualize/providers/profile_provider.dart';
+ // ✅ Import your ProfileProvider (adjust path )
+
 
 class SignupPage extends StatefulWidget {
   const SignupPage({Key? key}) : super(key: key);
@@ -15,9 +18,9 @@ class _SignupPageState extends State<SignupPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  final FirebaseAuth _auth = FirebaseAuth.instance; // ✅ Add FirebaseAuth instance
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// ✅ Firebase Signup Function
+  /// ✅ Updated Firebase Signup Function
   Future<void> _signUp() async {
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -27,17 +30,29 @@ class _SignupPageState extends State<SignupPage> {
     }
 
     try {
-      await _auth.createUserWithEmailAndPassword( // ✅ Now `_auth` is recognized
+      // ✅ Step 1: Create user
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // ✅ Step 2: Update display name (IMPORTANT)
+      await userCredential.user!.updateDisplayName(_nameController.text.trim());
+      await userCredential.user!.reload(); // refresh user info
+      FirebaseAuth.instance.currentUser; // now has updated display name
+
+      // ✅ Step 3: Optional — sync with ProfileProvider
+      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+      await profileProvider.loadUserFromFirebase(); // fetch name & email from Firebase
+
+      // ✅ Step 4: Show success and navigate
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Signup Successful')),
       );
-      Navigator.pop(context); // ✅ Navigate back after signup
+      Navigator.pop(context); // navigate back to login
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())), // ✅ Show error if signup fails
+        SnackBar(content: Text(e.toString())),
       );
     }
   }
@@ -96,10 +111,10 @@ class _SignupPageState extends State<SignupPage> {
                   isPassword: true,
                 ),
                 const SizedBox(height: 24),
-                
-                /// ✅ Call `_signUp()` function on button press
+
+                /// ✅ Sign Up Button calls updated `_signUp()` function
                 ElevatedButton(
-                  onPressed: _signUp, // ✅ Now signup works!
+                  onPressed: _signUp,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(

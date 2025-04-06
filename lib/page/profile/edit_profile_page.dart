@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:habitualize/providers/profile_provider.dart';
+import 'package:intl/intl.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({Key? key}) : super(key: key);
@@ -17,8 +18,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _locationController;
+  late TextEditingController _dobController;
   File? _profileImage;
   bool _notificationsEnabled = true;
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -28,6 +31,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _emailController = TextEditingController(text: profileData.email);
     _phoneController = TextEditingController(text: profileData.phone);
     _locationController = TextEditingController(text: profileData.location);
+    _dobController = TextEditingController(text: profileData.dob);
     _notificationsEnabled = profileData.notificationsEnabled;
     if (profileData.profileImagePath != null) {
       _profileImage = File(profileData.profileImagePath!);
@@ -45,6 +49,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
   void _saveProfile() {
     if (_formKey.currentState!.validate()) {
       context.read<ProfileProvider>().updateProfile(
@@ -52,6 +71,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             email: _emailController.text,
             phone: _phoneController.text,
             location: _locationController.text,
+            dob: _dobController.text,
             profileImagePath: _profileImage?.path,
             notificationsEnabled: _notificationsEnabled,
           );
@@ -184,6 +204,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                // DOB Field
+                TextFormField(
+                  controller: _dobController,
+                  decoration: InputDecoration(
+                    labelText: 'Date of Birth',
+                    prefixIcon: const Icon(Icons.calendar_today),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.calendar_month),
+                      onPressed: _selectDate,
+                    ),
+                  ),
+                  readOnly: true,
+                  onTap: _selectDate,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 24),
                 // Additional Settings
                 Card(
@@ -250,6 +292,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _emailController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 }

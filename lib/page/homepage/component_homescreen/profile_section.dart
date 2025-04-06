@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:habitualize/page/homepage/component_homescreen/streak_section.dart';
 import 'package:habitualize/widgets/my_calendar.dart';
 import 'package:habitualize/page/profile/profile_page.dart';
+import 'package:provider/provider.dart';
+import 'package:habitualize/providers/profile_provider.dart';
 
 class ProfileSection extends StatelessWidget {
   const ProfileSection({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final profileData = context.watch<ProfileProvider>().profileData;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.all(20),
@@ -49,18 +53,18 @@ class ProfileSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Row(
-                    children: const [
+                    children: [
                       Text(
-                        'John Doe',
-                        style: TextStyle(
+                        profileData.name,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 24,
                           color: Colors.white,
                           letterSpacing: 0.5,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Icon(
+                      const SizedBox(width: 8),
+                      const Icon(
                         Icons.verified,
                         color: Colors.white,
                         size: 18,
