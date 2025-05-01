@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/journal_service.dart';
 
 class JournalEntry {
+  final String id; // Added id field
   final String title;
   final String content;
   final DateTime date;
@@ -9,12 +13,37 @@ class JournalEntry {
   final List<String> tags;
 
   JournalEntry({
+    this.id = '', // Default empty id
     required this.title,
     required this.content,
     required this.date,
     required this.mood,
     required this.tags,
   });
+
+  // Added factory constructor to create from Firestore
+  factory JournalEntry.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return JournalEntry(
+      id: doc.id,
+      title: data['title'] ?? '',
+      content: data['content'] ?? '',
+      date: (data['date'] as Timestamp).toDate(),
+      mood: data['mood'] ?? 'neutral',
+      tags: List<String>.from(data['tags'] ?? []),
+    );
+  }
+
+  // Added method to convert to Firestore data
+  Map<String, dynamic> toFirestore() {
+    return {
+      'title': title,
+      'content': content,
+      'date': Timestamp.fromDate(date),
+      'mood': mood,
+      'tags': tags,
+    };
+  }
 }
 
 class JournalPage extends StatefulWidget {
@@ -25,9 +54,68 @@ class JournalPage extends StatefulWidget {
 }
 
 class _JournalPageState extends State<JournalPage> {
-  final List<JournalEntry> _entries = [];
+  final JournalService _journalService = JournalService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  List<JournalEntry> _entries = []; // Will be populated from Firestore
+
+  @override
+  void initState() {
+    super.initState();
+    _setupJournalListener();
+  }
+
+  void _setupJournalListener() {
+    _journalService.getJournalEntries().listen((QuerySnapshot snapshot) {
+      setState(() {
+        _entries = snapshot.docs
+            .map((doc) => JournalEntry.fromFirestore(doc))
+            .toList();
+      });
+    });
+  }
+
+  // Update save entry method
+  Future<void> _saveEntry(
+      String title, String content, String mood, List<String> tags) async {
+    try {
+      await _journalService.saveJournalEntry(
+        content: content,
+        date: DateTime.now(),
+        additionalData: {
+          'title': title,
+          'mood': mood,
+          'tags': tags,
+        },
+      );
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error saving entry. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Update delete entry method
+  Future<void> _deleteEntry(JournalEntry entry) async {
+    try {
+      await _journalService.deleteJournalEntry(entry.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error deleting entry. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -239,27 +327,8 @@ class _JournalPageState extends State<JournalPage> {
                               ),
                             );
                           },
-                          onDismissed: (direction) {
-                            setState(() {
-                              _entries.remove(entry);
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Entry deleted'),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                action: SnackBarAction(
-                                  label: 'Undo',
-                                  onPressed: () {
-                                    setState(() {
-                                      _entries.add(entry);
-                                    });
-                                  },
-                                ),
-                              ),
-                            );
+                          onDismissed: (direction) async {
+                            await _deleteEntry(entry);
                           },
                           child: _buildJournalEntryCard(entry),
                         );
@@ -695,20 +764,15 @@ class _JournalPageState extends State<JournalPage> {
                             ),
                             const Spacer(),
                             TextButton.icon(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (titleController.text.isNotEmpty &&
                                     contentController.text.isNotEmpty) {
-                                  this.setState(() {
-                                    _entries.add(
-                                      JournalEntry(
-                                        title: titleController.text,
-                                        content: contentController.text,
-                                        date: DateTime.now(),
-                                        mood: selectedMood,
-                                        tags: selectedTags,
-                                      ),
-                                    );
-                                  });
+                                  await _saveEntry(
+                                    titleController.text,
+                                    contentController.text,
+                                    selectedMood,
+                                    selectedTags,
+                                  );
                                   Navigator.pop(context);
                                 } else {
                                   // Show required fields message
@@ -1274,10 +1338,8 @@ class _JournalPageState extends State<JournalPage> {
                               ),
                             ),
                             TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _entries.remove(entry);
-                                });
+                              onPressed: () async {
+                                await _deleteEntry(entry);
                                 Navigator.pop(
                                     context); // Close confirmation dialog
                                 Navigator.pop(
@@ -1293,10 +1355,13 @@ class _JournalPageState extends State<JournalPage> {
                                     action: SnackBarAction(
                                       label: 'Undo',
                                       textColor: Colors.white,
-                                      onPressed: () {
-                                        setState(() {
-                                          _entries.add(entry);
-                                        });
+                                      onPressed: () async {
+                                        await _saveEntry(
+                                          entry.title,
+                                          entry.content,
+                                          entry.mood,
+                                          entry.tags,
+                                        );
                                       },
                                     ),
                                   ),
