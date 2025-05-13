@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:percent_indicator/percent_indicator.dart';
+import 'package:habitualize/services/habit_progress_service.dart';
 
 class RoutineSection extends StatefulWidget {
   final String title;
@@ -18,7 +19,9 @@ class RoutineSection extends StatefulWidget {
 }
 
 class _RoutineSectionState extends State<RoutineSection> {
+  final HabitProgressService _progressService = HabitProgressService();
   Map<String, bool> habitsChecked = {};
+  Map<String, Map<String, dynamic>> habitStats = {};
   List<String> habits = [];
   TextEditingController habitController = TextEditingController();
   bool isExpanded = false;
@@ -29,7 +32,15 @@ class _RoutineSectionState extends State<RoutineSection> {
     habits = [...widget.defaultHabits];
     for (var habit in habits) {
       habitsChecked.putIfAbsent(habit, () => false);
+      _loadHabitStats(habit);
     }
+  }
+
+  Future<void> _loadHabitStats(String habit) async {
+    final stats = await _progressService.getHabitStatistics(habit);
+    setState(() {
+      habitStats[habit] = stats;
+    });
   }
 
   double get completionRate {
@@ -43,6 +54,7 @@ class _RoutineSectionState extends State<RoutineSection> {
       setState(() {
         habits.add(habitController.text);
         habitsChecked[habitController.text] = false;
+        _loadHabitStats(habitController.text);
         habitController.clear();
       });
     }
@@ -52,7 +64,19 @@ class _RoutineSectionState extends State<RoutineSection> {
     setState(() {
       habits.remove(habit);
       habitsChecked.remove(habit);
+      habitStats.remove(habit);
     });
+  }
+
+  Future<void> _onHabitToggle(String habit, bool isChecked) async {
+    setState(() {
+      habitsChecked[habit] = isChecked;
+    });
+
+    if (isChecked) {
+      await _progressService.markHabitComplete(habit, widget.routineType);
+      await _loadHabitStats(habit);
+    }
   }
 
   @override
@@ -294,7 +318,6 @@ class _RoutineSectionState extends State<RoutineSection> {
                   const SizedBox(height: 20),
                   // Habits List
                   ...habits.asMap().entries.map((entry) {
-                    final int index = entry.key;
                     final String habit = entry.value;
                     final bool isChecked = habitsChecked[habit] ?? false;
 
@@ -328,11 +351,7 @@ class _RoutineSectionState extends State<RoutineSection> {
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
                         leading: InkWell(
-                          onTap: () {
-                            setState(() {
-                              habitsChecked[habit] = !isChecked;
-                            });
-                          },
+                          onTap: () => _onHabitToggle(habit, !isChecked),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(

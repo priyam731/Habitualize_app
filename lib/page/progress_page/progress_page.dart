@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:percent_indicator/percent_indicator.dart';
+import 'package:habitualize/services/habit_progress_service.dart';
 
 class ProgressPage extends StatefulWidget {
   const ProgressPage({Key? key}) : super(key: key);
@@ -11,6 +12,7 @@ class ProgressPage extends StatefulWidget {
 
 class _ProgressPageState extends State<ProgressPage>
     with TickerProviderStateMixin {
+  final HabitProgressService _progressService = HabitProgressService();
   late TabController _tabController;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -28,6 +30,10 @@ class _ProgressPageState extends State<ProgressPage>
   int _selectedChartIndex = 0;
   final List<String> _periods = ['Week', 'Month', 'Year'];
 
+  // Progress data
+  Map<String, Map<String, dynamic>> _habitStats = {};
+  List<String> _habits = [];
+
   @override
   void initState() {
     super.initState();
@@ -42,29 +48,50 @@ class _ProgressPageState extends State<ProgressPage>
       curve: Curves.easeOut,
     );
 
-    // Initialize scroll controllers
-    _habitsScrollController = ScrollController();
-    _chartsScrollController = ScrollController();
-    _insightsScrollController = ScrollController();
+    _initializeScrollControllers();
+    _loadHabitsData();
+  }
 
-    // Add scroll listeners to track position for scroll-to-top button
-    _habitsScrollController.addListener(() {
-      setState(() {
-        _showHabitsScrollTopButton = _habitsScrollController.offset > 300;
+  void _initializeScrollControllers() {
+    _habitsScrollController = ScrollController()
+      ..addListener(() {
+        setState(() {
+          _showHabitsScrollTopButton = _habitsScrollController.offset > 300;
+        });
       });
-    });
 
-    _chartsScrollController.addListener(() {
-      setState(() {
-        _showChartsScrollTopButton = _chartsScrollController.offset > 300;
+    _chartsScrollController = ScrollController()
+      ..addListener(() {
+        setState(() {
+          _showChartsScrollTopButton = _chartsScrollController.offset > 300;
+        });
       });
-    });
 
-    _insightsScrollController.addListener(() {
-      setState(() {
-        _showInsightsScrollTopButton = _insightsScrollController.offset > 300;
+    _insightsScrollController = ScrollController()
+      ..addListener(() {
+        setState(() {
+          _showInsightsScrollTopButton = _insightsScrollController.offset > 300;
+        });
       });
-    });
+  }
+
+  Future<void> _loadHabitsData() async {
+    // In a real app, you would load the habits list from somewhere
+    _habits = [
+      'Morning Meditation',
+      'Reading',
+      'Exercise',
+      'Drinking Water',
+      'Journaling',
+      'Early Sleep'
+    ];
+
+    for (var habit in _habits) {
+      final stats = await _progressService.getHabitStatistics(habit);
+      setState(() {
+        _habitStats[habit] = stats;
+      });
+    }
 
     _animationController.forward();
   }
@@ -276,6 +303,21 @@ class _ProgressPageState extends State<ProgressPage>
   }
 
   Widget _buildSummaryCards() {
+    double totalCompletion = 0;
+    int totalHabits = _habits.length;
+    int maxStreak = 0;
+
+    // Calculate overall statistics
+    _habitStats.forEach((habit, stats) {
+      totalCompletion += stats['completionRate'] ?? 0;
+      final currentStreak = stats['currentStreak'] ?? 0;
+      if (currentStreak > maxStreak) {
+        maxStreak = currentStreak;
+      }
+    });
+
+    double avgCompletion = totalHabits > 0 ? totalCompletion / totalHabits : 0;
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -292,19 +334,22 @@ class _ProgressPageState extends State<ProgressPage>
           Row(
             children: [
               Expanded(
-                  child: _buildSummaryCard('Daily Streak', '12 days',
+                  child: _buildSummaryCard('Daily Streak', '$maxStreak days',
                       Icons.local_fire_department, Colors.orange)),
               const SizedBox(width: 16),
               Expanded(
                   child: _buildSummaryCard(
-                      'Completed', '85%', Icons.task_alt, Colors.green)),
+                      'Completed',
+                      '${avgCompletion.toStringAsFixed(1)}%',
+                      Icons.task_alt,
+                      Colors.green)),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                  child: _buildSummaryCard('Total Habits', '24',
+                  child: _buildSummaryCard('Total Habits', '$totalHabits',
                       Icons.format_list_bulleted, Colors.blue)),
               const SizedBox(width: 16),
               Expanded(
@@ -413,6 +458,17 @@ class _ProgressPageState extends State<ProgressPage>
   }
 
   Widget _buildHabitsTab() {
+    // Sort habits by completion rate
+    final sortedHabits = [..._habits];
+    sortedHabits.sort((a, b) {
+      final aRate = _habitStats[a]?['completionRate'] ?? 0.0;
+      final bRate = _habitStats[b]?['completionRate'] ?? 0.0;
+      return bRate.compareTo(aRate);
+    });
+
+    final topHabits = sortedHabits.take(4).toList();
+    final needsImprovement = sortedHabits.skip(4).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -424,25 +480,37 @@ class _ProgressPageState extends State<ProgressPage>
           ),
         ),
         const SizedBox(height: 16),
-        _buildHabitProgressItem('Morning Meditation', 0.95, Colors.green),
-        const SizedBox(height: 12),
-        _buildHabitProgressItem('Reading', 0.8, Colors.purple),
-        const SizedBox(height: 12),
-        _buildHabitProgressItem('Exercise', 0.75, Colors.red),
-        const SizedBox(height: 12),
-        _buildHabitProgressItem('Drinking Water', 0.7, Colors.blue),
+        ...topHabits.map((habit) => Column(
+              children: [
+                _buildHabitProgressItem(
+                  habit,
+                  (_habitStats[habit]?['completionRate'] ?? 0.0) / 100,
+                  _getHabitColor(habit),
+                ),
+                const SizedBox(height: 12),
+              ],
+            )),
         const SizedBox(height: 24),
-        const Text(
-          'Needs Improvement',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        if (needsImprovement.isNotEmpty) ...[
+          const Text(
+            'Needs Improvement',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        _buildHabitProgressItem('Journaling', 0.4, Colors.orange),
-        const SizedBox(height: 12),
-        _buildHabitProgressItem('Early Sleep', 0.3, Colors.indigo),
+          const SizedBox(height: 16),
+          ...needsImprovement.map((habit) => Column(
+                children: [
+                  _buildHabitProgressItem(
+                    habit,
+                    (_habitStats[habit]?['completionRate'] ?? 0.0) / 100,
+                    _getHabitColor(habit),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              )),
+        ],
       ],
     );
   }
@@ -816,38 +884,101 @@ class _ProgressPageState extends State<ProgressPage>
   }
 
   Widget _buildInsightsTab() {
+    List<InsightData> insights = _generateInsights();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildInsightCard(
+      children: insights.map((insight) {
+        return Column(
+          children: [
+            _buildInsightCard(
+              insight.title,
+              insight.content,
+              insight.icon,
+              insight.color,
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  List<InsightData> _generateInsights() {
+    List<InsightData> insights = [];
+
+    // Find best performing habit
+    String? bestHabit;
+    double bestRate = 0;
+    _habitStats.forEach((habit, stats) {
+      final rate = stats['completionRate'] ?? 0.0;
+      if (rate > bestRate) {
+        bestRate = rate;
+        bestHabit = habit;
+      }
+    });
+
+    if (bestHabit != null) {
+      final streak = _habitStats[bestHabit]!['currentStreak'] ?? 0;
+      if (streak > 0) {
+        insights.add(InsightData(
           'Great Consistency!',
-          "You've completed your meditation habit 12 days in a row. Keep up the good work!",
+          "You've maintained your '$bestHabit' habit for $streak days in a row. Keep up the good work!",
           Icons.celebration,
           Colors.amber,
-        ),
-        const SizedBox(height: 16),
-        _buildInsightCard(
-          'Time to Focus',
-          'Your productivity seems to peak in the morning. Consider scheduling important tasks early in the day.',
-          Icons.lightbulb,
-          Colors.blue,
-        ),
-        const SizedBox(height: 16),
-        _buildInsightCard(
-          'Improvement Needed',
-          "You've been missing your early sleep habit. Try setting a reminder 30 minutes before bedtime.",
-          Icons.tips_and_updates,
-          Colors.red,
-        ),
-        const SizedBox(height: 16),
-        _buildInsightCard(
-          'New Milestone!',
-          "You've tracked habits for 30 days straight! That's a sign of great dedication.",
-          Icons.emoji_events,
-          Colors.green,
-        ),
-      ],
-    );
+        ));
+      }
+    }
+
+    // Find habit needing improvement
+    String? worstHabit;
+    double worstRate = double.infinity;
+    _habitStats.forEach((habit, stats) {
+      final rate = stats['completionRate'] ?? 0.0;
+      if (rate < worstRate) {
+        worstRate = rate;
+        worstHabit = habit;
+      }
+    });
+
+    if (worstHabit != null && worstRate < 50) {
+      insights.add(InsightData(
+        'Needs Attention',
+        "Your '$worstHabit' habit could use some focus. Try setting a daily reminder to help you stay on track.",
+        Icons.tips_and_updates,
+        Colors.red,
+      ));
+    }
+
+    // Overall progress insight
+    double totalCompletion = 0;
+    int count = 0;
+    _habitStats.forEach((_, stats) {
+      totalCompletion += stats['completionRate'] ?? 0;
+      count++;
+    });
+
+    final averageCompletion = count > 0 ? totalCompletion / count : 0;
+    if (averageCompletion >= 80) {
+      insights.add(InsightData(
+        'Outstanding Progress!',
+        'Your overall completion rate is ${averageCompletion.toStringAsFixed(1)}%! You\'re showing excellent commitment to your habits.',
+        Icons.emoji_events,
+        Colors.green,
+      ));
+    }
+
+    // Add a motivational insight if needed
+    if (insights.length < 3) {
+      insights.add(InsightData(
+        'Keep Going!',
+        'Remember, small consistent actions lead to big changes over time. Every completed habit is a step toward your goals.',
+        Icons.lightbulb,
+        Colors.blue,
+      ));
+    }
+
+    return insights;
   }
 
   Widget _buildInsightCard(
@@ -1045,40 +1176,61 @@ class _ProgressPageState extends State<ProgressPage>
   }
 
   List<FlSpot> _getChartData() {
+    // Calculate average completion rate for all habits for each day/week/month
     if (_selectedChartIndex == 0) {
-      // Week
-      return [
-        const FlSpot(0, 60),
-        const FlSpot(1, 65),
-        const FlSpot(2, 78),
-        const FlSpot(3, 70),
-        const FlSpot(4, 85),
-        const FlSpot(5, 90),
-        const FlSpot(6, 88),
-      ];
+      // Week view - show last 7 days
+      List<double> dailyRates = List.filled(7, 0.0);
+      int habitsCount = _habits.length;
+      if (habitsCount == 0) return [];
+
+      _habitStats.forEach((habit, stats) {
+        List<double> rates =
+            stats['dailyRates']?.cast<double>() ?? List.filled(7, 0.0);
+        for (int i = 0; i < 7; i++) {
+          dailyRates[i] += rates[i];
+        }
+      });
+
+      // Calculate averages
+      return List.generate(7, (index) {
+        return FlSpot(index.toDouble(), dailyRates[index] / habitsCount);
+      });
     } else if (_selectedChartIndex == 1) {
-      // Month
-      List<FlSpot> spots = [];
-      for (int i = 0; i < 30; i++) {
-        spots.add(FlSpot(i.toDouble(), 50 + (i % 5) * 10 + (i % 3) * 5));
-      }
-      return spots;
+      // Month view - show last 30 days
+      List<double> monthlyRates = List.filled(30, 0.0);
+      int habitsCount = _habits.length;
+      if (habitsCount == 0) return [];
+
+      _habitStats.forEach((habit, stats) {
+        List<double> rates =
+            stats['monthlyRates']?.cast<double>() ?? List.filled(30, 0.0);
+        for (int i = 0; i < 30; i++) {
+          monthlyRates[i] += rates[i];
+        }
+      });
+
+      // Calculate averages
+      return List.generate(30, (index) {
+        return FlSpot(index.toDouble(), monthlyRates[index] / habitsCount);
+      });
     } else {
-      // Year
-      return [
-        const FlSpot(0, 65),
-        const FlSpot(1, 68),
-        const FlSpot(2, 72),
-        const FlSpot(3, 75),
-        const FlSpot(4, 70),
-        const FlSpot(5, 75),
-        const FlSpot(6, 80),
-        const FlSpot(7, 85),
-        const FlSpot(8, 80),
-        const FlSpot(9, 85),
-        const FlSpot(10, 88),
-        const FlSpot(11, 92),
-      ];
+      // Year view - show last 12 months
+      List<double> yearlyRates = List.filled(12, 0.0);
+      int habitsCount = _habits.length;
+      if (habitsCount == 0) return [];
+
+      _habitStats.forEach((habit, stats) {
+        List<double> rates =
+            stats['yearlyRates']?.cast<double>() ?? List.filled(12, 0.0);
+        for (int i = 0; i < 12; i++) {
+          yearlyRates[i] += rates[i];
+        }
+      });
+
+      // Calculate averages
+      return List.generate(12, (index) {
+        return FlSpot(index.toDouble(), yearlyRates[index] / habitsCount);
+      });
     }
   }
 
@@ -1100,4 +1252,32 @@ class _ProgressPageState extends State<ProgressPage>
         return Icons.check_circle;
     }
   }
+
+  Color _getHabitColor(String habit) {
+    switch (habit.toLowerCase()) {
+      case 'morning meditation':
+        return Colors.purple;
+      case 'reading':
+        return Colors.blue;
+      case 'exercise':
+        return Colors.red;
+      case 'drinking water':
+        return Colors.cyan;
+      case 'journaling':
+        return Colors.orange;
+      case 'early sleep':
+        return Colors.indigo;
+      default:
+        return Colors.grey;
+    }
+  }
+}
+
+class InsightData {
+  final String title;
+  final String content;
+  final IconData icon;
+  final Color color;
+
+  InsightData(this.title, this.content, this.icon, this.color);
 }
